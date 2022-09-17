@@ -1,0 +1,10 @@
+/_build
+/cover
+/deps
+erl_crash.dump
+*.ez
+
+# Common additions for various operating systems:
+# MacOS
+.DS_Store
+
