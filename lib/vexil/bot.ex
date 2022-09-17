@@ -75,6 +75,8 @@ defmodule Vexil.Bot do
 
   def seek_flag(game, me) do  # FIXME!!
     stuff = can_see(game, me)
+    IO.puts "seek_flag: #{inspect stuff}"
+    :timer.sleep 3000
 # Ruby code:
 #   flag = stuff.select {|x| x.is_a? Flag }.first
 #   unless flag.nil?  # Remember to tell others where flag is
@@ -127,6 +129,7 @@ defmodule Vexil.Bot do
     if result do
       {game, bot}
     else
+      IO.puts "  Recursive - Attempting move - #{inspect bot} to #{inspect dest}"
       attempt_move(game, bot, rest)
     end
   end

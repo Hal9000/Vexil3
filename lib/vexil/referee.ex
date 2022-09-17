@@ -94,6 +94,7 @@ defmodule Vexil.Referee do
           g = Grid.put(grid, {team, x1, y1}, piece)
           g = Grid.put(g, {team, x0, y0}, nil)
           # FIXME mark game as over
+          # Moved onto opponent's flag??
           IO.puts "Moved onto #{dest} - game over - FIXME"
           {g, false}  # logic??
         true ->
@@ -121,12 +122,8 @@ defmodule Vexil.Referee do
   end
 
   def mainloop(game) do
-#   IO.puts "game pid in REF = #{inspect game.pid}"
-#   IO.puts "REF pid = #{inspect self()}"
-#   IO.puts "Referee is listening..."
     g = receive do
       {caller, _bot_game, :move, team, x0, y0, x1, y1} ->
-#       IO.puts "mainloop: #{team} moves from #{inspect {x0, y0}} to #{inspect {x1, y1}}"
         {g2, ret} = move(game, team, x0, y0, x1, y1)
         if ret do
           send(caller, {g2, ret})
@@ -135,8 +132,8 @@ defmodule Vexil.Referee do
       other -> IO.puts "Got: #{inspect(other)}"
       after 5000 -> IO.puts "referee Timeout 5 sec"
     end
-#   IO.puts "debugging..."
-    :timer.sleep 200
+
+    :timer.sleep 2000
     mainloop(g) # tail recursion
   end
 
