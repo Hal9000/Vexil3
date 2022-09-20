@@ -1,15 +1,15 @@
 defmodule Vexil.Referee do
   alias Vexil.{Bot, Grid, Referee}
 
-  defstruct [:grid, :bots, :pid, :over?]
+  defstruct [:grid, :bots, :pid, :started?, :over?]
 
   def new do 
     {grid, bots} = setup(%{})
-    %Referee{grid: grid, bots: bots, pid: nil, over?: false}
+    %Referee{grid: grid, bots: bots, pid: nil, started?: false, over?: false}
   end
 
   def new(grid, bots) do
-    %Referee{grid: grid, bots: bots, pid: nil, over?: false}
+    %Referee{grid: grid, bots: bots, pid: nil, started?: false, over?: false}
   end
 
   def verify(where, sig1, sig2) do
@@ -22,16 +22,17 @@ defmodule Vexil.Referee do
   end
 
   def place(grid, bots, team, kind, x, y) do
-    x2 = if Range.range?(x), do: rand(x), else: x
-    y2 = if Range.range?(y), do: rand(y), else: y
+    # FIXME Next two lines = warning: Range.range?/1 is deprecated. Pattern match on first..last//step instead
+    x2 = if match?(_a.._b, x), do: rand(x), else: x
+    y2 = if match?(_a.._b, y), do: rand(y), else: y
     
     bot = Bot.make(kind, team, x2, y2)
     {grid, bots} = 
-    if Grid.cell_empty?(grid, {team, x2, y2}) do
-      {Grid.put(grid, {team, x2, y2}, bot), bots}
-    else
-      place(grid, bots, team, kind, x, y)
-    end
+      if Grid.cell_empty?(grid, {team, x2, y2}) do
+        {Grid.put(grid, {team, x2, y2}, bot), bots}
+      else
+        place(grid, bots, team, kind, x, y)
+      end
     bots = [bot] ++ bots
     {grid, bots}
   end
@@ -40,7 +41,7 @@ defmodule Vexil.Referee do
   def rand(n1..n2), do: :rand.uniform(n2 - n1 + 1) + n1 - 1
 
   def setup(grid) do
-    {grid, redbots} = setup(grid, :red)
+    {grid, redbots}  = setup(grid, :red)
     {grid, bluebots} = setup(grid, :blue)
     bots = redbots ++ bluebots
     {grid, bots}
@@ -111,8 +112,9 @@ defmodule Vexil.Referee do
 
   def start_link(game) do
     pid = spawn_link Referee, :mainloop, [game]
-    game = %Referee{game | pid: pid}
+    game = %Referee{game | pid: pid, started?: true}
     Enum.each(game.bots, fn(bot) -> Bot.awaken(bot, game) end)
+    # ^ Reference started? flag instead of this?
     game
   end
 
@@ -125,9 +127,7 @@ defmodule Vexil.Referee do
     g = receive do
       {caller, _bot_game, :move, team, x0, y0, x1, y1} ->
         {g2, ret} = move(game, team, x0, y0, x1, y1)
-        if ret do
-          send(caller, {g2, ret})
-        end
+        if ret, do: send(caller, {g2, ret})
         g2
       other -> IO.puts "Got: #{inspect(other)}"
       after 5000 -> IO.puts "referee Timeout 5 sec"

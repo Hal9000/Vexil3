@@ -10,15 +10,15 @@ defmodule Vexil.Bot do
   end
 
   def fighter(team, x, y) do
-    %Bot{team: team, kind: :fighter, move: 2, see: 3, defend: 6, attack: 4, range: 2, x: x, y: y} # FIXME
+    %Bot{team: team, kind: :fighter, move: 4, see: 6, defend: 6, attack: 6, range: 4, x: x, y: y}
   end
 
   def scout(team, x, y) do
-    %Bot{team: team, kind: :scout, move: 2, see: 3, defend: 6, attack: 4, range: 2, x: x, y: y} # FIXME
+    %Bot{team: team, kind: :scout, move: 5, see: 8, defend: 3, attack: 2, range: 1, x: x, y: y}
   end
 
   def flag(team, x, y) do
-    %Bot{team: team, kind: :flag, move: 2, see: 3, defend: 6, attack: 4, range: 2, x: x, y: y} # FIXME
+    %Bot{team: team, kind: :flag, move: 0, see: 0, defend: 0, attack: 0, range: 0, x: x, y: y}
   end
 
   def make(kind, team, x, y) do
@@ -42,7 +42,7 @@ defmodule Vexil.Bot do
   def within(game, bot, n) do
 #   IO.puts "grid = #{inspect game.grid}"
 #   IO.puts "bot = #{inspect bot}"
-    found = []
+    _found = []
     grid = game.grid
     team = bot.team
     {x, y} = {bot.x, bot.y}
@@ -51,7 +51,7 @@ defmodule Vexil.Bot do
     
     filter = &(&1 == nil or Bot.where(&1) == Bot.where(bot))
     list = for x <- xr, y <- yr do
-      piece = Grid.get(grid, {team, x, y})
+      _piece = Grid.get(grid, {team, x, y})
     end
     Enum.reject(list, filter)
   end
@@ -69,7 +69,7 @@ defmodule Vexil.Bot do
   end
 
   def can_attack(game, me) do  # Things I can attack
-    list = within(game, me, me.range)
+    _list = within(game, me, me.range)
 #   list = list.reject {|x| x.is_a? Flag }
   end
 
@@ -92,21 +92,22 @@ defmodule Vexil.Bot do
   end
 
 
-  def move(game, true, bot, dx, dy), do: {game, bot, false}
+  def move(%Referee{over?: true} = game, bot, _dx, _dy), do: {game, bot, false}
 
-  def move(game, false, bot, dx, dy) do
+  def move(game, bot, dx, dy) do
     x2 = bot.x + dx
     y2 = bot.y + dy
 
     # send msg to referee
 #   IO.puts "game pid in bot = #{inspect game.pid}"
 #   IO.puts "#{inspect self()} sends to referee"
-    {g, result} = Comms.sendrecv(game.pid, {self(), game, :move, bot.team, bot.x, bot.y, x2, y2})
+    {game, result} = Comms.sendrecv(game.pid, {self(), game, :move, bot.team, bot.x, bot.y, x2, y2})
 #   IO.puts "---- AFTER sendrecv"
     bot2 = if result do
-      Referee.record(g, :move, bot)  # $game.record("#{self.who} moves to #@x,#@y")
+      Referee.record(game, :move, bot)  # $game.record("#{self.who} moves to #@x,#@y")
       b2 = %Bot{bot | x: x2}
-      b3 = %Bot{b2  | y: y2}
+# Huh??
+      _b3 = %Bot{b2  | y: y2}
     else
       bot
     end
@@ -125,7 +126,7 @@ defmodule Vexil.Bot do
   def attempt_move(game, bot, [dest | rest]) do
     IO.puts "Attempting move - #{inspect bot} to #{inspect dest}"
     {dx, dy} = dest
-    {game, bot, result} = move(game, Referee.over?(game), bot, dx, dy)
+    {game, bot, result} = move(game, bot, dx, dy)
     if result do
       {game, bot}
     else
@@ -135,6 +136,8 @@ defmodule Vexil.Bot do
   end
 
 ## credit mononym
+
+  def turn(_kind, bot, game) when game.started?, do: {game, bot}
 
   def turn(:fighter, bot, game) do
     # FIXME will call move, attack
