@@ -81,13 +81,13 @@ defmodule Vexil.Referee do
   end
 
   def move(game, team, x0, y0, x1, y1) do
+#    IO.puts "#move: game = #{inspect game}"
     grid = game.grid
     piece = Grid.get(grid, {team, x0, y0})
     dest = Grid.get(grid, {team, x1, y1})
     {grid, ret} = 
       cond do 
         dest == nil ->
-#         IO.puts "move: normal case"
           g = Grid.put(grid, {team, x1, y1}, piece)
           g = Grid.put(g, {team, x0, y0}, nil)
           {g, true}
@@ -99,7 +99,6 @@ defmodule Vexil.Referee do
           IO.puts "Moved onto #{dest} - game over - FIXME"
           {g, false}  # logic??
         true ->
-#         IO.puts "SOMETHING WRONG? Can't move #{inspect piece} onto #{inspect dest}"
           {grid, false}
       end
     game = %Referee{game | grid: grid}
@@ -118,23 +117,24 @@ defmodule Vexil.Referee do
     game
   end
 
-  def simulate(game) do 
-    pid = spawn Referee, :mainloop, [game]
-    %Referee{game | pid: pid}
-  end
-
   def mainloop(game) do
     g = receive do
       {caller, _bot_game, :move, team, x0, y0, x1, y1} ->
+        IO.puts "calling #move..."
         {g2, ret} = move(game, team, x0, y0, x1, y1)
+        IO.puts "...called #move"
         if ret, do: send(caller, {g2, ret})
         g2
-      other -> IO.puts "Got: #{inspect(other)}"
+      other -> IO.puts "Got: #{inspect(other)}"; :timer.sleep 2000
+        game
       after 5000 -> IO.puts "referee Timeout 5 sec"
+        game
     end
 
-    :timer.sleep 2000
-    mainloop(g) # tail recursion
+    if ! g.over? do
+      :timer.sleep 2000
+      mainloop(g) # tail recursion
+    end
   end
 
 end

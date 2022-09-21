@@ -75,7 +75,7 @@ defmodule Vexil.Bot do
 
   def seek_flag(game, me) do  # FIXME!!
     stuff = can_see(game, me)
-    IO.puts "seek_flag: #{inspect stuff}"
+#   IO.puts "seek_flag: #{inspect stuff}"
     :timer.sleep 3000
 # Ruby code:
 #   flag = stuff.select {|x| x.is_a? Flag }.first
@@ -99,10 +99,10 @@ defmodule Vexil.Bot do
     y2 = bot.y + dy
 
     # send msg to referee
-#   IO.puts "game pid in bot = #{inspect game.pid}"
-#   IO.puts "#{inspect self()} sends to referee"
+# IO.puts "game pid in bot = #{inspect game.pid}"
+# IO.puts "#{inspect self()} sends to referee"
     {game, result} = Comms.sendrecv(game.pid, {self(), game, :move, bot.team, bot.x, bot.y, x2, y2})
-#   IO.puts "---- AFTER sendrecv"
+# IO.puts "---- AFTER sendrecv"
     bot2 = if result do
       Referee.record(game, :move, bot)  # $game.record("#{self.who} moves to #@x,#@y")
       b2 = %Bot{bot | x: x2}
@@ -116,6 +116,7 @@ defmodule Vexil.Bot do
   end
 
   def try_moves(game, bot, dx, dy) do
+# IO.puts "In #try_moves"
     deltas = [{dx, dy}, {dx-1, dy+1}, {dx+1, dy-1}, {dx-2, dy+2}, {dx+2, dy-2}]
     {game, bot} = attempt_move(game, bot, deltas)
     {game, bot}
@@ -124,22 +125,23 @@ defmodule Vexil.Bot do
   def attempt_move(game, bot, []), do: {game, bot}
 
   def attempt_move(game, bot, [dest | rest]) do
-    IO.puts "Attempting move - #{inspect bot} to #{inspect dest}"
+#    IO.puts "Attempting move - #{inspect bot} to #{inspect dest}"
     {dx, dy} = dest
     {game, bot, result} = move(game, bot, dx, dy)
     if result do
       {game, bot}
     else
-      IO.puts "  Recursive - Attempting move - #{inspect bot} to #{inspect dest}"
+#      IO.puts "  Recursive - Attempting move - #{inspect bot} to #{inspect dest}"
       attempt_move(game, bot, rest)
     end
   end
 
 ## credit mononym
 
-  def turn(_kind, bot, game) when game.started?, do: {game, bot}
+#  def turn(_kind, bot, game) when game.started?, do: {game, bot}
 
   def turn(:fighter, bot, game) do
+# IO.puts "Calling #turn (fighter)"
     # FIXME will call move, attack
     {game, bot} = try_moves(game, bot, 2, 2)
 ##    seek_flag
@@ -152,6 +154,7 @@ defmodule Vexil.Bot do
   end
 
   def turn(:defender, bot, game) do
+# IO.puts "Calling #turn (defender)"
     # FIXME will call move, attack
 ##    @strength = @attack
 ##    victims = can_attack
@@ -160,6 +163,7 @@ defmodule Vexil.Bot do
   end
 
   def turn(:scout, bot, game) do
+# IO.puts "Calling #turn (scout)"
     # FIXME will call move, attack
     try_moves(game, bot, 3, 3)
 ##    seek_flag
@@ -176,12 +180,19 @@ defmodule Vexil.Bot do
   def mainloop(bot, game) do
     # the bot lives its life -- run, attack, whatever
     # see 'turn' in Ruby version
-    {game, bot} = turn(bot.kind, bot, game)
+    if game.started? do
+#IO.puts "bot mainloop 1: #{inspect bot}"
+      {game, bot} = turn(bot.kind, bot, game)
+    else
+# IO.puts "bot mainloop 2: #{inspect bot}"
+      :timer.sleep 100
+    end
     mainloop(bot, game)
   end
 
   def awaken(bot, game) do
-    :timer.sleep 100
+    :timer.sleep 1000
+# IO.puts "Awaken: #{inspect bot}"
     spawn_link Bot, :mainloop, [bot, game]
   end
 
