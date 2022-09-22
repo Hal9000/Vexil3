@@ -84,11 +84,11 @@ class Referee
       pieces << all[Red][num] << all[Blue][num]
     end
     pieces.compact!
-    pieces.each do |piece| 
+    pieces.each.with_index do |piece, i| 
       break if $game.over?
       # $game.record("pieces = #{pieces.map(&:to_s)}") # ("-- Moving #{piece.inspect}")
       # $game.display
-      piece.turn
+      piece.turn(i)
       $game.display
       break if $game.over?
     end

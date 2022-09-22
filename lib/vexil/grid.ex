@@ -17,10 +17,10 @@ defmodule Vexil.Grid do
       
   """
 
-  def get(grid, {:red, x, y}),  do: Map.get(grid, {:red, x, y})
+  def get(grid, {:red,  x, y}), do: Map.get(grid, {:red, x, y})
   def get(grid, {:blue, x, y}), do: Map.get(grid, {:red, 22-x, 22-y})
 
-  def put(grid, {:red, x, y}, piece),  do: Map.put(grid, {:red, x, y}, piece)
+  def put(grid, {:red,  x, y}, piece), do: Map.put(grid, {:red, x, y}, piece)
   def put(grid, {:blue, x, y}, piece), do: Map.put(grid, {:red, 22-x, 22-y}, piece)
 
   def put(grid, piece), do: Map.put(grid, {piece.team, piece.x, piece.y}, piece)
@@ -45,7 +45,7 @@ defmodule Vexil.Grid do
   end
 
   def display(grid) do
-    IO.puts "\e[H\e[2J"  # clear screen
+#   IO.puts "\e[H\e[2J"  # clear screen
     IO.puts ""
     yrange = 21..1
     xrange = 1..21

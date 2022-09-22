@@ -72,7 +72,7 @@ class Bot
     list = list.reject {|x| x.is_a? Flag }
   end
   
-  def turn
+  def turn(num)
     return if $game.over?
     puts "#@team #{self.class} at #@x,#@y takes a turn"
   end

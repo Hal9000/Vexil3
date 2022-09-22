@@ -81,10 +81,11 @@ defmodule Vexil.Referee do
   end
 
   def move(game, team, x0, y0, x1, y1) do
-#    IO.puts "#move: game = #{inspect game}"
     grid = game.grid
     piece = Grid.get(grid, {team, x0, y0})
     dest = Grid.get(grid, {team, x1, y1})
+IO.puts "move got: #{inspect {team, x0, y0, x1, y1}}"
+:timer.sleep 2000
     {grid, ret} = 
       cond do 
         dest == nil ->
@@ -110,31 +111,97 @@ defmodule Vexil.Referee do
   def record(_x, _y, _z), do: nil  # FIXME
 
   def start_link(game) do
-    pid = spawn_link Referee, :mainloop, [game]
+    who = :red
+    pid = spawn_link Referee, :mainloop, [game, who]
     game = %Referee{game | pid: pid, started?: true}
     Enum.each(game.bots, fn(bot) -> Bot.awaken(bot, game) end)
     # ^ Reference started? flag instead of this?
     game
   end
 
-  def mainloop(game) do
-    g = receive do
-      {caller, _bot_game, :move, team, x0, y0, x1, y1} ->
-        IO.puts "calling #move..."
-        {g2, ret} = move(game, team, x0, y0, x1, y1)
-        IO.puts "...called #move"
-        if ret, do: send(caller, {g2, ret})
-        g2
+  def take_turn(who) do
+    if who == :red do
+      :blue
+    else
+      :red
+    end
+  end
+
+  def handle_move(sender, game, team, x0, y0, x1, y1) do
+    display(game)
+:timer.sleep 700
+    IO.puts "handle_move: calling #move (#{inspect {team, x0, y0, x1, y1}})"
+    {g2, ret} = move(game, team, x0, y0, x1, y1)
+    if ret, do: send(sender, {g2, ret})
+    g2
+  end
+
+#   def mainloop(game, who) do
+#     who = take_turn(who)
+# IO.puts "referee mainloop: team = #{who}"
+#     g = receive do
+#       {sender, _bot_game, :move, :blue, x0, y0, x1, y1} ->
+# IO.puts "RECEIVED :blue  who = #{who}"
+#         if who == :blue do
+#           handle_move(sender, game, :blue, x0, y0, x1, y1)
+#         else
+#           game
+#         end
+#       {sender, _bot_game, :move, :red, x0, y0, x1, y1} ->
+# IO.puts "RECEIVED :red   who = #{who}"
+#         if who == :red do
+#           handle_move(sender, game, :red, x0, y0, x1, y1)
+#         else
+#           game
+#         end
+#       other -> IO.puts "Got: #{inspect(other)}"; :timer.sleep 2000
+#         game
+#       after 5000 -> IO.puts "referee Timeout 5 sec"
+#         game
+#     end
+# 
+# IO.puts "after receive"
+# 
+#     if ! g.over? do
+#       :timer.sleep 2000
+# IO.puts "recursing!\n\n "
+# :timer.sleep 2000
+#       mainloop(g, who) # tail recursion
+#     end
+# IO.puts "exiting!"
+#   end
+
+  def bot_message do
+    receive do
+      {sender, _bot_game, :move, team, x0, y0, x1, y1} ->
+        {sender, team, x0, y0, x1, y1}
       other -> IO.puts "Got: #{inspect(other)}"; :timer.sleep 2000
-        game
+        nil
       after 5000 -> IO.puts "referee Timeout 5 sec"
-        game
+        nil
+    end
+  end
+
+  def mainloop(game, who) do
+    who = take_turn(who)
+IO.puts "referee mainloop: team = #{who}"
+ 
+    {sender, team, x0, y0, x1, y1} = bot_message()
+    g2 = case team do
+      :red -> 
+        if who == team, do: handle_move(sender, game, team, x0, y0, x1, y1), else: game
+      :blue -> 
+        if who == team, do: handle_move(sender, game, team, x0, y0, x1, y1), else: game
+      true -> game
     end
 
-    if ! g.over? do
+    if ! g2.over? do
       :timer.sleep 2000
-      mainloop(g) # tail recursion
+IO.puts "recursing!\n\n "
+:timer.sleep 2000
+      mainloop(g2, who) # tail recursion
     end
+IO.puts "exiting!"
   end
 
 end
