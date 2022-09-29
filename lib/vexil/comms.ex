@@ -15,4 +15,16 @@ defmodule Vexil.Comms do
     result
   end
 
+  def ask_game_state(refpid) do
+    send(refpid, "check_status")
+    result = receive do 
+      :starting  -> :starting
+      :playing   -> :playing
+      :over      -> :over
+      other      -> IO.puts "Received #{inspect other} instead of status"; nil
+      after 1000 -> IO.puts "Timeout checking game status"; nil
+    end
+    result
+  end
+
 end

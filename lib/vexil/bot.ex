@@ -74,9 +74,9 @@ defmodule Vexil.Bot do
   end
 
   def seek_flag(game, me) do  # FIXME!!
-    stuff = can_see(game, me)
+    _stuff = can_see(game, me)
 #   IO.puts "seek_flag: #{inspect stuff}"
-    :timer.sleep 3000
+    :timer.sleep 1000
 # Ruby code:
 #   flag = stuff.select {|x| x.is_a? Flag }.first
 #   unless flag.nil?  # Remember to tell others where flag is
@@ -92,7 +92,7 @@ defmodule Vexil.Bot do
   end
 
 
-  def move(%Referee{over?: true} = game, bot, _dx, _dy), do: {game, bot, false}
+  def move(%Referee{status: :over} = game, bot, _dx, _dy), do: {game, bot, false}
 
   def move(game, bot, dx, dy) do
     x2 = bot.x + dx
@@ -100,7 +100,7 @@ defmodule Vexil.Bot do
 
     # send msg to referee
 # IO.puts "game pid in bot = #{inspect game.pid}"
-# IO.puts "#{inspect self()} sends to referee"
+  IO.puts "  msg to referee from #{show_bot(bot)}: #{{bot.team, bot.x, bot.y, x2, y2}}"
     {game, result} = Comms.sendrecv(game.pid, {self(), game, :move, bot.team, bot.x, bot.y, x2, y2})
 # IO.puts "---- AFTER sendrecv"
     bot2 = if result do
@@ -138,7 +138,7 @@ defmodule Vexil.Bot do
 
 ## credit mononym
 
-#  def turn(_kind, bot, game) when game.started?, do: {game, bot}
+#  def turn(_kind, bot, game) when game.playing?, do: {game, bot}
 
   def turn(:fighter, bot, game) do
 # IO.puts "Calling #turn (fighter)"
@@ -177,22 +177,28 @@ defmodule Vexil.Bot do
 
   def turn(:flag, bot, game), do: {game, bot}
 
+  def show_bot(bot) do
+    pid = self()
+    letter = bot.kind |> Kernel.to_string |> String.first |> String.capitalize
+    "Bot: #{Bot.to_string(bot)}@#{bot.x},#{bot.y}  pid = #{inspect pid}"
+  end
+
   def mainloop(bot, game) do
     # the bot lives its life -- run, attack, whatever
     # see 'turn' in Ruby version
-    if game.started? do
-#IO.puts "bot mainloop 1: #{inspect bot}"
+IO.puts "Bot mainloop:  status = #{game.status}"
+    status = Comms.ask_game_state(game.pid)
+    if status == :playing do
       {game, bot} = turn(bot.kind, bot, game)
     else
-# IO.puts "bot mainloop 2: #{inspect bot}"
-      :timer.sleep 100
+      :timer.sleep 2000
     end
     mainloop(bot, game)
   end
 
   def awaken(bot, game) do
-    :timer.sleep 1000
-# IO.puts "Awaken: #{inspect bot}"
+    :timer.sleep 100
+  IO.puts "Awaken: #{show_bot(bot)}"
     spawn_link Bot, :mainloop, [bot, game]
   end
 

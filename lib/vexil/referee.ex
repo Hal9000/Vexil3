@@ -1,15 +1,21 @@
 defmodule Vexil.Referee do
   alias Vexil.{Bot, Grid, Referee}
 
-  defstruct [:grid, :bots, :pid, :started?, :over?]
+  defstruct [:grid, :bots, :pid, status: :starting]
 
   def new do 
     {grid, bots} = setup(%{})
-    %Referee{grid: grid, bots: bots, pid: nil, started?: false, over?: false}
+    %Referee{grid: grid, bots: bots, pid: nil, status: :starting}
   end
 
   def new(grid, bots) do
-    %Referee{grid: grid, bots: bots, pid: nil, started?: false, over?: false}
+    %Referee{grid: grid, bots: bots, pid: nil, status: :starting}
+  end
+
+  def start! do
+    game = %Referee{status: :playing}
+    who = :red
+    spawn_link Referee, :mainloop, [game, who]
   end
 
   def verify(where, sig1, sig2) do
@@ -22,7 +28,6 @@ defmodule Vexil.Referee do
   end
 
   def place(grid, bots, team, kind, x, y) do
-    # FIXME Next two lines = warning: Range.range?/1 is deprecated. Pattern match on first..last//step instead
     x2 = if match?(_a.._b, x), do: rand(x), else: x
     y2 = if match?(_a.._b, y), do: rand(y), else: y
     
@@ -85,7 +90,6 @@ defmodule Vexil.Referee do
     piece = Grid.get(grid, {team, x0, y0})
     dest = Grid.get(grid, {team, x1, y1})
 IO.puts "move got: #{inspect {team, x0, y0, x1, y1}}"
-:timer.sleep 2000
     {grid, ret} = 
       cond do 
         dest == nil ->
@@ -106,16 +110,19 @@ IO.puts "move got: #{inspect {team, x0, y0, x1, y1}}"
     {game, ret}
   end
 
-  def over?(game), do: game.over?
+  def over?(game), do: game.status == :over
 
   def record(_x, _y, _z), do: nil  # FIXME
 
   def start_link(game) do
-    who = :red
-    pid = spawn_link Referee, :mainloop, [game, who]
-    game = %Referee{game | pid: pid, started?: true}
     Enum.each(game.bots, fn(bot) -> Bot.awaken(bot, game) end)
-    # ^ Reference started? flag instead of this?
+IO.puts "start_link: sleeping 10 sec"
+:timer.sleep 10000
+IO.puts "    spawn_link()..."
+#    pid = spawn_link Referee, :mainloop, [game, who]
+     pid = start!()
+IO.puts "    Marking game status PLAYING"
+    game = %Referee{game | pid: pid, status: :playing}
     game
   end
 
@@ -129,62 +136,38 @@ IO.puts "move got: #{inspect {team, x0, y0, x1, y1}}"
 
   def handle_move(sender, game, team, x0, y0, x1, y1) do
     display(game)
-:timer.sleep 700
-    IO.puts "handle_move: calling #move (#{inspect {team, x0, y0, x1, y1}})"
+    IO.puts "    handle_move: calling #move (#{inspect {team, x0, y0, x1, y1}})"
     {g2, ret} = move(game, team, x0, y0, x1, y1)
+    IO.puts "    move() returned #{ret}"
     if ret, do: send(sender, {g2, ret})
     g2
   end
 
-#   def mainloop(game, who) do
-#     who = take_turn(who)
-# IO.puts "referee mainloop: team = #{who}"
-#     g = receive do
-#       {sender, _bot_game, :move, :blue, x0, y0, x1, y1} ->
-# IO.puts "RECEIVED :blue  who = #{who}"
-#         if who == :blue do
-#           handle_move(sender, game, :blue, x0, y0, x1, y1)
-#         else
-#           game
-#         end
-#       {sender, _bot_game, :move, :red, x0, y0, x1, y1} ->
-# IO.puts "RECEIVED :red   who = #{who}"
-#         if who == :red do
-#           handle_move(sender, game, :red, x0, y0, x1, y1)
-#         else
-#           game
-#         end
-#       other -> IO.puts "Got: #{inspect(other)}"; :timer.sleep 2000
-#         game
-#       after 5000 -> IO.puts "referee Timeout 5 sec"
-#         game
-#     end
-# 
-# IO.puts "after receive"
-# 
-#     if ! g.over? do
-#       :timer.sleep 2000
-# IO.puts "recursing!\n\n "
-# :timer.sleep 2000
-#       mainloop(g, who) # tail recursion
-#     end
-# IO.puts "exiting!"
-#   end
+# FIXME Bot should receive game from referee??
 
   def bot_message do
     receive do
       {sender, _bot_game, :move, team, x0, y0, x1, y1} ->
         {sender, team, x0, y0, x1, y1}
-      other -> IO.puts "Got: #{inspect(other)}"; :timer.sleep 2000
-        nil
-      after 5000 -> IO.puts "referee Timeout 5 sec"
-        nil
+      {sender, "check_status"} -> "FIXME"  # brain stopped here
+      other -> 
+        IO.puts "Got: #{inspect(other)}"
+        :timer.sleep 2000
+        {nil, nil, nil, nil, nil, nil} 
+      after 5000 -> 
+        IO.puts "referee Timeout 5 sec"
+        {nil, nil, nil, nil, nil, nil} 
     end
   end
 
   def mainloop(game, who) do
+IO.puts "Mainloop: status = #{game.status}"
+IO.puts "Mainloop: sleep 3 secs"
+:timer.sleep 3000
+IO.puts "Mainloop: NOW status = #{game.status}"
     who = take_turn(who)
-IO.puts "referee mainloop: team = #{who}"
+IO.puts "-- referee mainloop: It's #{who |> to_string |> String.upcase}'s turn"
+:timer.sleep 3000
  
     {sender, team, x0, y0, x1, y1} = bot_message()
     g2 = case team do
@@ -195,7 +178,7 @@ IO.puts "referee mainloop: team = #{who}"
       true -> game
     end
 
-    if ! g2.over? do
+    if ! Game.over?(g2) do
       :timer.sleep 2000
 IO.puts "recursing!\n\n "
 :timer.sleep 2000
