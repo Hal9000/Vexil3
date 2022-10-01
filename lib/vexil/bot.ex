@@ -37,7 +37,7 @@ defmodule Vexil.Bot do
     str
   end
 
-# Move to Grid??
+# Move most of this to Referee...
 
   def within(game, bot, n) do
 #   IO.puts "grid = #{inspect game.grid}"
@@ -183,7 +183,29 @@ defmodule Vexil.Bot do
     "Bot: #{Bot.to_string(bot)}@#{bot.x},#{bot.y}  pid = #{inspect pid}"
   end
 
-  def mainloop(bot, game) do
+# Thoughts:
+#   Don't pass the game to the bot-- just the referee pid
+#   Bot must query referee for everything: game status, what is nearby, ...
+#   Maybe make that a single exchange?
+#     - bot queries referee
+#     - bot gets game status, nearby bots
+#     - bot requests a move
+#     - bot gets success/fail re move
+# 
+
+  def query_referee(bot, refpid) do
+    send(refpid, bot)
+    response = receive do  # hmm, how verify it's from ref??
+      
+    end
+  end
+
+  def mainloop(bot, refpid) do
+    # the bot lives its life -- run, attack, whatever
+    # see 'turn' in Ruby version
+  end
+
+  def old_mainloop(bot, game) do
     # the bot lives its life -- run, attack, whatever
     # see 'turn' in Ruby version
 IO.puts "Bot mainloop:  status = #{game.status}"
