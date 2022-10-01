@@ -1,28 +1,28 @@
 defmodule Vexil.Bot do
   alias Vexil.{Bot, Comms, Grid, Referee}
 
-  defstruct team: nil, kind: nil, move: nil, see: nil,
+  defstruct refpid: nil, mypid: nil, team: nil, kind: nil, move: nil, see: nil,
             defend: nil, attack: nil, range: nil,
             x: nil, y: nil
 
-  def defender(team, x, y) do
-    %Bot{team: team, kind: :defender, move: 2, see: 3, defend: 6, attack: 4, range: 2, x: x, y: y}
+  def defender(refpid, team, x, y) do
+    %Bot{refpid: refpid, team: team, kind: :defender, move: 2, see: 3, defend: 6, attack: 4, range: 2, x: x, y: y}
   end
 
-  def fighter(team, x, y) do
-    %Bot{team: team, kind: :fighter, move: 4, see: 6, defend: 6, attack: 6, range: 4, x: x, y: y}
+  def fighter(refpid, team, x, y) do
+    %Bot{refpid: refpid, team: team, kind: :fighter, move: 4, see: 6, defend: 6, attack: 6, range: 4, x: x, y: y}
   end
 
-  def scout(team, x, y) do
-    %Bot{team: team, kind: :scout, move: 5, see: 8, defend: 3, attack: 2, range: 1, x: x, y: y}
+  def scout(refpid, team, x, y) do
+    %Bot{refpid: refpid, team: team, kind: :scout, move: 5, see: 8, defend: 3, attack: 2, range: 1, x: x, y: y}
   end
 
-  def flag(team, x, y) do
-    %Bot{team: team, kind: :flag, move: 0, see: 0, defend: 0, attack: 0, range: 0, x: x, y: y}
+  def flag(refpid, team, x, y) do
+    %Bot{refpid: refpid, team: team, kind: :flag, move: 0, see: 0, defend: 0, attack: 0, range: 0, x: x, y: y}
   end
 
-  def make(kind, team, x, y) do
-    apply(Bot, kind, [team, x, y])
+  def make(refpid, kind, team, x, y) do
+    apply(Bot, kind, [refpid, team, x, y])
   end
 
   def to_string(bot) do
@@ -35,25 +35,6 @@ defmodule Vexil.Bot do
       "\e[34m#{char}\e[0m"
     end
     str
-  end
-
-# Move most of this to Referee...
-
-  def within(game, bot, n) do
-#   IO.puts "grid = #{inspect game.grid}"
-#   IO.puts "bot = #{inspect bot}"
-    _found = []
-    grid = game.grid
-    team = bot.team
-    {x, y} = {bot.x, bot.y}
-    {x0, y0, x1, y1} = {x-n, x+n, y-n, y+n}
-    {xr, yr} = {x0..x1, y0..y1}
-    
-    filter = &(&1 == nil or Bot.where(&1) == Bot.where(bot))
-    list = for x <- xr, y <- yr do
-      _piece = Grid.get(grid, {team, x, y})
-    end
-    Enum.reject(list, filter)
   end
 
   def where(bot) do
@@ -138,31 +119,29 @@ defmodule Vexil.Bot do
 
 ## credit mononym
 
-#  def turn(_kind, bot, game) when game.playing?, do: {game, bot}
+#   def turn(kind, bot, _visible) do
+# # IO.puts "Calling #turn (fighter)"
+#     # FIXME will call move, attack
+#     {game, bot} = try_moves(game, bot, 2, 2)
+# ##    seek_flag
+# ##
+# ##    @strength = @attack
+# ##    victims = can_attack
+# ##    victims.each {|enemy| try_attack(2, enemy) || break }
+# ##    move!(2, 2)
+#     {game, bot}
+#   end
 
-  def turn(:fighter, bot, game) do
-# IO.puts "Calling #turn (fighter)"
-    # FIXME will call move, attack
-    {game, bot} = try_moves(game, bot, 2, 2)
-##    seek_flag
-##
-##    @strength = @attack
-##    victims = can_attack
-##    victims.each {|enemy| try_attack(2, enemy) || break }
-##    move!(2, 2)
-    {game, bot}
-  end
-
-  def turn(:defender, bot, game) do
+  def turn(:defender, bot, _visible) do
 # IO.puts "Calling #turn (defender)"
     # FIXME will call move, attack
 ##    @strength = @attack
 ##    victims = can_attack
 ##    victims.each {|enemy| try_attack(3, enemy) || break }
-    {game, bot}
+    {bot}
   end
 
-  def turn(:scout, bot, game) do
+  def turn(:scout, bot, _visible) do
 # IO.puts "Calling #turn (scout)"
     # FIXME will call move, attack
     try_moves(game, bot, 3, 3)
@@ -172,10 +151,10 @@ defmodule Vexil.Bot do
 ##    victims = can_attack
 ##    victims.each {|enemy| try_attack(1, enemy) || break }
 ##    move!(3, 3)
-    {game, bot}
+    {bot}
   end
 
-  def turn(:flag, bot, game), do: {game, bot}
+  def turn(:flag, bot, _visible), do: {game, bot}
 
   def show_bot(bot) do
     pid = self()
@@ -196,32 +175,35 @@ defmodule Vexil.Bot do
   def query_referee(bot, refpid) do
     send(refpid, bot)
     response = receive do  # hmm, how verify it's from ref??
-      
+      :starting -> nil;
+      :over     -> nil;
+      {:playing, visible} -> Bot.turn(visible)
     end
   end
 
   def mainloop(bot, refpid) do
     # the bot lives its life -- run, attack, whatever
     # see 'turn' in Ruby version
+    if bot.mypid == nil, do: %Bot{bot | mypid: self()}  # returned
   end
 
-  def old_mainloop(bot, game) do
-    # the bot lives its life -- run, attack, whatever
-    # see 'turn' in Ruby version
-IO.puts "Bot mainloop:  status = #{game.status}"
-    status = Comms.ask_game_state(game.pid)
-    if status == :playing do
-      {game, bot} = turn(bot.kind, bot, game)
-    else
-      :timer.sleep 2000
-    end
-    mainloop(bot, game)
-  end
+#   def old_mainloop(bot, game) do
+#     # the bot lives its life -- run, attack, whatever
+#     # see 'turn' in Ruby version
+# IO.puts "Bot mainloop:  status = #{game.status}"
+#     status = Comms.ask_game_state(game.pid)
+#     if status == :playing do
+#       {game, bot} = turn(bot.kind, bot, game)
+#     else
+#       :timer.sleep 2000
+#     end
+#     mainloop(bot, game)
+#   end
 
-  def awaken(bot, game) do
+  def awaken(bot, refpid) do
     :timer.sleep 100
   IO.puts "Awaken: #{show_bot(bot)}"
-    spawn_link Bot, :mainloop, [bot, game]
+    spawn_link Bot, :mainloop, [bot, refpid]
   end
 
 end

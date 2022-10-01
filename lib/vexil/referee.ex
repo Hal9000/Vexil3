@@ -5,17 +5,8 @@ defmodule Vexil.Referee do
 
   def new do 
     {grid, bots} = setup(%{})
-    %Referee{grid: grid, bots: bots, pid: nil, status: :starting}
-  end
-
-  def new(grid, bots) do
-    %Referee{grid: grid, bots: bots, pid: nil, status: :starting}
-  end
-
-  def start! do
-    game = %Referee{status: :playing}
-    who = :red
-    spawn_link Referee, :mainloop, [game, who]
+    ref = %Referee{grid: grid, bots: bots, pid: nil, status: :starting}
+    ref
   end
 
   def verify(where, sig1, sig2) do
@@ -114,16 +105,11 @@ IO.puts "move got: #{inspect {team, x0, y0, x1, y1}}"
 
   def record(_x, _y, _z), do: nil  # FIXME
 
-  def start_link(game) do
-    Enum.each(game.bots, fn(bot) -> Bot.awaken(bot, game) end)
-IO.puts "start_link: sleeping 10 sec"
-:timer.sleep 10000
-IO.puts "    spawn_link()..."
-#    pid = spawn_link Referee, :mainloop, [game, who]
-     pid = start!()
-IO.puts "    Marking game status PLAYING"
-    game = %Referee{game | pid: pid, status: :playing}
-    game
+  def start_link() do
+    game = Referee.new   # game setup, start bots
+    who = :red
+    refpid = spawn_link Referee, :mainloop, [game, who]
+    Enum.each(game.bots, &(Bot.awaken(&1, refpid)))
   end
 
   def take_turn(who) do
@@ -143,17 +129,51 @@ IO.puts "    Marking game status PLAYING"
     g2
   end
 
+  def within(game, bot) do
+#   IO.puts "grid = #{inspect game.grid}"
+#   IO.puts "bot = #{inspect bot}"
+    n = bot.see
+    _found = []
+    grid = game.grid
+    team = bot.team
+    {x, y} = {bot.x, bot.y}
+    {x0, y0, x1, y1} = {x-n, x+n, y-n, y+n}
+    {xr, yr} = {x0..x1, y0..y1}
+    
+    filter = &(&1 == nil or Bot.where(&1) == Bot.where(bot))
+    list = for x <- xr, y <- yr do
+      _piece = Grid.get(grid, {team, x, y})
+    end
+    Enum.reject(list, filter)
+  end
+
+  def get_bot_move(bot, game) do
+    {kind, bx, by} = {bot.kind, bot.x, bot.y}
+    visible = within(game, bot)      
+    expected = bot.mypid
+    send(expected, visible)    # parallel to #1, #2
+    # let bot take a turn
+    receive do 
+      %Bot{} = bot2        -> send(bot2.mypid, :noreply)
+      {%Bot{mypid: expected} = bot, :move, :tox, :toy} -> nil
+    end
+  end
+
+  def handle_bot_message(bot, game) do
+    sender = bot.mypid
+    case game.status do
+      :starting -> send(sender, :starting)   # case #1
+      :over     -> send(sender, :over)       # case #2
+      :playing  -> get_bot_move(bot, game)   # case #3
+    end
+  end
+
 # FIXME Bot should receive game from referee??
 
-  def bot_message do
+  def bot_message(game) do
     receive do
-      {sender, _bot_game, :move, team, x0, y0, x1, y1} ->
-        {sender, team, x0, y0, x1, y1}
-      {sender, "check_status"} -> "FIXME"  # brain stopped here
-      other -> 
-        IO.puts "Got: #{inspect(other)}"
-        :timer.sleep 2000
-        {nil, nil, nil, nil, nil, nil} 
+      %Bot{} = bot -> 
+        handle_bot_message(bot, game)         
       after 5000 -> 
         IO.puts "referee Timeout 5 sec"
         {nil, nil, nil, nil, nil, nil} 
@@ -161,15 +181,9 @@ IO.puts "    Marking game status PLAYING"
   end
 
   def mainloop(game, who) do
-IO.puts "Mainloop: status = #{game.status}"
-IO.puts "Mainloop: sleep 3 secs"
-:timer.sleep 3000
-IO.puts "Mainloop: NOW status = #{game.status}"
+    _refpid = self()
     who = take_turn(who)
-IO.puts "-- referee mainloop: It's #{who |> to_string |> String.upcase}'s turn"
-:timer.sleep 3000
- 
-    {sender, team, x0, y0, x1, y1} = bot_message()
+    {sender, team, x0, y0, x1, y1} = bot_message(game)
     g2 = case team do
       :red -> 
         if who == team, do: handle_move(sender, game, team, x0, y0, x1, y1), else: game
