@@ -7,7 +7,7 @@ defmodule Mix.Tasks.Vexil.Game do
     :rand.seed(:exsplus, {0,0,0})
     game = Referee.new
     Referee.display(game)
-    game = Referee.start_link(game)
+    game = Referee.start_link()
     :timer.sleep 400000 
     # Referee.display(game)
   end

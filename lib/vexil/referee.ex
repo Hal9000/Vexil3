@@ -22,7 +22,7 @@ defmodule Vexil.Referee do
     x2 = if match?(_a.._b, x), do: rand(x), else: x
     y2 = if match?(_a.._b, y), do: rand(y), else: y
     
-    bot = Bot.make(kind, team, x2, y2)
+    bot = Bot.make(self(), kind, team, x2, y2)
     {grid, bots} = 
       if Grid.cell_empty?(grid, {team, x2, y2}) do
         {Grid.put(grid, {team, x2, y2}, bot), bots}
@@ -148,14 +148,14 @@ IO.puts "move got: #{inspect {team, x0, y0, x1, y1}}"
   end
 
   def get_bot_move(bot, game) do
-    {kind, bx, by} = {bot.kind, bot.x, bot.y}
+    {_kind, _bx, _by} = {bot.kind, bot.x, bot.y}
     visible = within(game, bot)      
     expected = bot.mypid
     send(expected, visible)    # parallel to #1, #2
     # let bot take a turn
     receive do 
       %Bot{} = bot2        -> send(bot2.mypid, :noreply)
-      {%Bot{mypid: expected} = bot, :move, :tox, :toy} -> nil
+      {%Bot{mypid: ^expected} = _bot, :move, :tox, :toy} -> nil
     end
   end
 
@@ -184,15 +184,17 @@ IO.puts "move got: #{inspect {team, x0, y0, x1, y1}}"
     _refpid = self()
     who = take_turn(who)
     {sender, team, x0, y0, x1, y1} = bot_message(game)
+IO.inspect {sender, team, x0, y0, x1, y1}
     g2 = case team do
       :red -> 
         if who == team, do: handle_move(sender, game, team, x0, y0, x1, y1), else: game
       :blue -> 
         if who == team, do: handle_move(sender, game, team, x0, y0, x1, y1), else: game
+      nil  -> game
       true -> game
     end
 
-    if ! Game.over?(g2) do
+    if ! Referee.over?(g2) do
       :timer.sleep 2000
 IO.puts "recursing!\n\n "
 :timer.sleep 2000

@@ -6,19 +6,19 @@ defmodule Vexil.Bot do
             x: nil, y: nil
 
   def defender(refpid, team, x, y) do
-    %Bot{refpid: refpid, team: team, kind: :defender, move: 2, see: 3, defend: 6, attack: 4, range: 2, x: x, y: y}
+    %Bot{refpid: refpid, mypid: self(), team: team, kind: :defender, move: 2, see: 3, defend: 6, attack: 4, range: 2, x: x, y: y}
   end
 
   def fighter(refpid, team, x, y) do
-    %Bot{refpid: refpid, team: team, kind: :fighter, move: 4, see: 6, defend: 6, attack: 6, range: 4, x: x, y: y}
+    %Bot{refpid: refpid, mypid: self(), team: team, kind: :fighter, move: 4, see: 6, defend: 6, attack: 6, range: 4, x: x, y: y}
   end
 
   def scout(refpid, team, x, y) do
-    %Bot{refpid: refpid, team: team, kind: :scout, move: 5, see: 8, defend: 3, attack: 2, range: 1, x: x, y: y}
+    %Bot{refpid: refpid, mypid: self(), team: team, kind: :scout, move: 5, see: 8, defend: 3, attack: 2, range: 1, x: x, y: y}
   end
 
   def flag(refpid, team, x, y) do
-    %Bot{refpid: refpid, team: team, kind: :flag, move: 0, see: 0, defend: 0, attack: 0, range: 0, x: x, y: y}
+    %Bot{refpid: refpid, mypid: self(), team: team, kind: :flag, move: 0, see: 0, defend: 0, attack: 0, range: 0, x: x, y: y}
   end
 
   def make(refpid, kind, team, x, y) do
@@ -45,17 +45,17 @@ defmodule Vexil.Bot do
     me.team != piece.team
   end
 
-  def can_see(game, me) do
-    within(game, me, me.see)
+  def can_see(_me) do
+    # within(game, me, me.see)
   end
 
-  def can_attack(game, me) do  # Things I can attack
-    _list = within(game, me, me.range)
+  def can_attack(_me) do  # Things I can attack
+#   _list = within(game, me, me.range)
 #   list = list.reject {|x| x.is_a? Flag }
   end
 
-  def seek_flag(game, me) do  # FIXME!!
-    _stuff = can_see(game, me)
+  def seek_flag(me) do  # FIXME!!
+    _stuff = can_see(me)
 #   IO.puts "seek_flag: #{inspect stuff}"
     :timer.sleep 1000
 # Ruby code:
@@ -73,19 +73,19 @@ defmodule Vexil.Bot do
   end
 
 
-  def move(%Referee{status: :over} = game, bot, _dx, _dy), do: {game, bot, false}
+  # def move(%Referee{status: :over} = game, bot, _dx, _dy), do: {game, bot, false}
 
-  def move(game, bot, dx, dy) do
+  def move(bot, dx, dy) do
     x2 = bot.x + dx
     y2 = bot.y + dy
 
     # send msg to referee
 # IO.puts "game pid in bot = #{inspect game.pid}"
   IO.puts "  msg to referee from #{show_bot(bot)}: #{{bot.team, bot.x, bot.y, x2, y2}}"
-    {game, result} = Comms.sendrecv(game.pid, {self(), game, :move, bot.team, bot.x, bot.y, x2, y2})
+    result = Comms.sendrecv(bot.refpid, {self(), 'game', :move, bot.team, bot.x, bot.y, x2, y2})
 # IO.puts "---- AFTER sendrecv"
     bot2 = if result do
-      Referee.record(game, :move, bot)  # $game.record("#{self.who} moves to #@x,#@y")
+      Referee.record(:move, bot.x, bot.y)  # $game.record("#{self.who} moves to #@x,#@y")
       b2 = %Bot{bot | x: x2}
 # Huh??
       _b3 = %Bot{b2  | y: y2}
@@ -93,44 +93,31 @@ defmodule Vexil.Bot do
       bot
     end
 
-    {game, bot2, result}
+    {bot2, result}
   end
 
-  def try_moves(game, bot, dx, dy) do
+  def try_moves(bot, dx, dy) do
 # IO.puts "In #try_moves"
     deltas = [{dx, dy}, {dx-1, dy+1}, {dx+1, dy-1}, {dx-2, dy+2}, {dx+2, dy-2}]
-    {game, bot} = attempt_move(game, bot, deltas)
-    {game, bot}
+    bot = attempt_move(bot, deltas)
+    bot
   end
 
-  def attempt_move(game, bot, []), do: {game, bot}
+  def attempt_move(bot, []), do: {bot}
 
-  def attempt_move(game, bot, [dest | rest]) do
+  def attempt_move(bot, [dest | rest]) do
 #    IO.puts "Attempting move - #{inspect bot} to #{inspect dest}"
     {dx, dy} = dest
-    {game, bot, result} = move(game, bot, dx, dy)
+    {bot, result} = move(bot, dx, dy)
     if result do
-      {game, bot}
+      {bot}
     else
 #      IO.puts "  Recursive - Attempting move - #{inspect bot} to #{inspect dest}"
-      attempt_move(game, bot, rest)
+      attempt_move(bot, rest)
     end
   end
 
-## credit mononym
-
-#   def turn(kind, bot, _visible) do
-# # IO.puts "Calling #turn (fighter)"
-#     # FIXME will call move, attack
-#     {game, bot} = try_moves(game, bot, 2, 2)
-# ##    seek_flag
-# ##
-# ##    @strength = @attack
-# ##    victims = can_attack
-# ##    victims.each {|enemy| try_attack(2, enemy) || break }
-# ##    move!(2, 2)
-#     {game, bot}
-#   end
+## credit mononym + Ken L
 
   def turn(:defender, bot, _visible) do
 # IO.puts "Calling #turn (defender)"
@@ -144,7 +131,7 @@ defmodule Vexil.Bot do
   def turn(:scout, bot, _visible) do
 # IO.puts "Calling #turn (scout)"
     # FIXME will call move, attack
-    try_moves(game, bot, 3, 3)
+    try_moves(bot, 3, 3)
 ##    seek_flag
 ##
 ##    @strength = @attack
@@ -154,11 +141,11 @@ defmodule Vexil.Bot do
     {bot}
   end
 
-  def turn(:flag, bot, _visible), do: {game, bot}
+  def turn(:flag, bot, _visible), do: {bot}
 
   def show_bot(bot) do
     pid = self()
-    letter = bot.kind |> Kernel.to_string |> String.first |> String.capitalize
+    # bot.kind |> Kernel.to_string |> String.first |> String.capitalize
     "Bot: #{Bot.to_string(bot)}@#{bot.x},#{bot.y}  pid = #{inspect pid}"
   end
 
@@ -174,31 +161,20 @@ defmodule Vexil.Bot do
 
   def query_referee(bot, refpid) do
     send(refpid, bot)
-    response = receive do  # hmm, how verify it's from ref??
+    receive do  # hmm, how verify it's from ref??
       :starting -> nil;
       :over     -> nil;
-      {:playing, visible} -> Bot.turn(visible)
+      {:playing, visible} -> Bot.turn(bot.kind, bot, visible)
     end
   end
 
   def mainloop(bot, refpid) do
     # the bot lives its life -- run, attack, whatever
     # see 'turn' in Ruby version
-    if bot.mypid == nil, do: %Bot{bot | mypid: self()}  # returned
+    if bot.mypid == nil, do: bot = %Bot{bot | mypid: self(), refpid: refpid}  # returned
+    query_referee(bot, refpid)
+    mainloop(bot, refpid)
   end
-
-#   def old_mainloop(bot, game) do
-#     # the bot lives its life -- run, attack, whatever
-#     # see 'turn' in Ruby version
-# IO.puts "Bot mainloop:  status = #{game.status}"
-#     status = Comms.ask_game_state(game.pid)
-#     if status == :playing do
-#       {game, bot} = turn(bot.kind, bot, game)
-#     else
-#       :timer.sleep 2000
-#     end
-#     mainloop(bot, game)
-#   end
 
   def awaken(bot, refpid) do
     :timer.sleep 100
