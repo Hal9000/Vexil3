@@ -120,13 +120,13 @@ IO.puts "move got: #{inspect {team, x0, y0, x1, y1}}"
     end
   end
 
-  def handle_move(sender, game, team, x0, y0, x1, y1) do
+  def handle_move(_sender, game, _team, _x0, _y0, _x1, _y1) do
     display(game)
-    IO.puts "    handle_move: calling #move (#{inspect {team, x0, y0, x1, y1}})"
-    {g2, ret} = move(game, team, x0, y0, x1, y1)
-    IO.puts "    move() returned #{ret}"
-    if ret, do: send(sender, {g2, ret})
-    g2
+#    IO.puts "    handle_move: calling #move (#{inspect {team, x0, y0, x1, y1}})"
+#    {g2, ret} = move(game, team, x0, y0, x1, y1)
+#    IO.puts "    move() returned #{ret}"
+#    if ret, do: send(sender, {g2, ret})
+    game   # was: g2
   end
 
   def within(game, bot) do
@@ -161,8 +161,11 @@ IO.puts "move got: #{inspect {team, x0, y0, x1, y1}}"
 
   def handle_bot_message(bot, game) do
     sender = bot.mypid
+IO.puts "hbm: status = #{game.status}"
     case game.status do
-      :starting -> send(sender, :starting)   # case #1
+      :starting -> 
+        IO.puts "  sending to #{inspect sender}"
+        send(sender, :starting)   # case #1
       :over     -> send(sender, :over)       # case #2
       :playing  -> get_bot_move(bot, game)   # case #3
     end
@@ -181,15 +184,18 @@ IO.puts "move got: #{inspect {team, x0, y0, x1, y1}}"
   end
 
   def mainloop(game, who) do
-    _refpid = self()
+IO.puts "Referee mainloop: self() = #{inspect self()}"
     who = take_turn(who)
     {sender, team, x0, y0, x1, y1} = bot_message(game)
 IO.inspect {sender, team, x0, y0, x1, y1}
     g2 = case team do
+# FIXME duh, first two cases are same??
       :red -> 
-        if who == team, do: handle_move(sender, game, team, x0, y0, x1, y1), else: game
+IO.puts "got RED"
+#       if who == team, do: handle_move(sender, game, team, x0, y0, x1, y1), else: game
       :blue -> 
-        if who == team, do: handle_move(sender, game, team, x0, y0, x1, y1), else: game
+IO.puts "got BLUE"
+#       if who == team, do: handle_move(sender, game, team, x0, y0, x1, y1), else: game
       nil  -> game
       true -> game
     end
