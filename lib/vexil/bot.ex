@@ -166,6 +166,7 @@ defmodule Vexil.Bot do
 IO.puts "Bot.query_referee got: :starting"
         nil;
       :over     -> nil;
+      :noreply  -> :timer.sleep 100
       {:playing, visible} -> Bot.turn(bot.kind, bot, visible)
     end
   end
@@ -181,7 +182,7 @@ IO.puts "bot mainloop: #{inspect bot}"
   end
 
   def awaken(bot, refpid) do
-    :timer.sleep 3000
+    :timer.sleep 1000
     spawn_link Bot, :mainloop, [bot, refpid]
   end
 

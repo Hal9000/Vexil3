@@ -1,12 +1,12 @@
 defmodule Vexil.Referee do
+  @empty {}
   alias Vexil.{Bot, Grid, Referee}
 
-  defstruct [:grid, :bots, :pid, status: :starting]
+  defstruct [:grid, :bots, :pid, status: :starting, whose_turn: :blue]
 
   def new do 
     {grid, bots} = setup(%{})
-    ref = %Referee{grid: grid, bots: bots, pid: nil, status: :starting}
-    ref
+    %Referee{grid: grid, whose_turn: :blue, bots: bots, pid: nil, status: :playing}
   end
 
   def verify(where, sig1, sig2) do
@@ -107,8 +107,7 @@ IO.puts "move got: #{inspect {team, x0, y0, x1, y1}}"
 
   def start_link() do
     game = Referee.new   # game setup, start bots
-    who = :red
-    refpid = spawn_link Referee, :mainloop, [game, who]
+    refpid = spawn_link Referee, :mainloop, [game]
     Enum.each(game.bots, &(Bot.awaken(&1, refpid)))
   end
 
@@ -148,25 +147,34 @@ IO.puts "move got: #{inspect {team, x0, y0, x1, y1}}"
   end
 
   def get_bot_move(bot, game) do
-    {_kind, _bx, _by} = {bot.kind, bot.x, bot.y}
-    visible = within(game, bot)      
+    # ref sends info to bot, wants a "move" back
+    visible = within(game, bot)
+IO.puts "gbm: vis = #{inspect visible}"
     expected = bot.mypid
-    send(expected, visible)    # parallel to #1, #2
     # let bot take a turn
-    receive do 
-      %Bot{} = bot2        -> send(bot2.mypid, :noreply)
-      {%Bot{mypid: ^expected} = _bot, :move, :tox, :toy} -> nil
+    response = receive do 
+      %Bot{} = bot2 -> 
+IO.puts "gbm: game.status = #{inspect game.status}"
+IO.puts "gbm send: bot2 = #{inspect bot2} - sending to #{inspect bot2.mypid}"
+        send(bot2.mypid, :noreply)
+        @empty
+      {%Bot{mypid: ^expected} = _bot, :move, :tox, :toy} -> 
+        # send "visible" info
+        send(expected, {:playing, visible})    # parallel to #1, #2
     end
   end
 
   def handle_bot_message(bot, game) do
+    # ref replies to initial bot message
     sender = bot.mypid
 IO.puts "hbm: status = #{game.status}"
     case game.status do
       :starting -> 
         IO.puts "  sending to #{inspect sender}"
         send(sender, :starting)   # case #1
+        @empty
       :over     -> send(sender, :over)       # case #2
+        @empty
       :playing  -> get_bot_move(bot, game)   # case #3
     end
   end
@@ -174,20 +182,25 @@ IO.puts "hbm: status = #{game.status}"
 # FIXME Bot should receive game from referee??
 
   def bot_message(game) do
+    # ref gets msg from bot
     receive do
       %Bot{} = bot -> 
         handle_bot_message(bot, game)         
       after 5000 -> 
         IO.puts "referee Timeout 5 sec"
-        {nil, nil, nil, nil, nil, nil} 
+        @empty
     end
   end
 
-  def mainloop(game, who) do
+  def mainloop(game) do
 IO.puts "Referee mainloop: self() = #{inspect self()}"
-    who = take_turn(who)
-    {sender, team, x0, y0, x1, y1} = bot_message(game)
-IO.inspect {sender, team, x0, y0, x1, y1}
+    who = take_turn(game.whose_turn)
+    game = %Referee{game | whose_turn: who}
+    msg = bot_message(game)
+IO.puts "ref mainloop: GOT MSG #{inspect msg}"
+   {sender, team, x0, y0, x1, y1} = msg
+# FIXME BRAIN STOPPED HERE
+IO.puts "WE MADE IT!"
     g2 = case team do
 # FIXME duh, first two cases are same??
       :red -> 
@@ -204,7 +217,7 @@ IO.puts "got BLUE"
       :timer.sleep 2000
 IO.puts "recursing!\n\n "
 :timer.sleep 2000
-      mainloop(g2, who) # tail recursion
+      mainloop(g2) # tail recursion
     end
 IO.puts "exiting!"
   end
