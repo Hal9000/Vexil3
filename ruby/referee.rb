@@ -28,8 +28,9 @@ class Referee
 
   def show_cell(xx, yy)
     obj = @grid[Red, xx, yy] 
-    strings = {Empty => " -", RedFlag => " X".red, BlueFlag => " X".blue}
-    print (strings[obj] || obj)
+#    strings = {Empty => " -", RedFlag => " X".red, BlueFlag => " X".blue}
+#    print (strings[obj] || obj)
+     print (Strings[obj] || obj)
   end
 
   def record(line)

@@ -198,26 +198,33 @@ IO.puts "Referee mainloop: self() = #{inspect self()}"
     game = %Referee{game | whose_turn: who}
     msg = bot_message(game)
 IO.puts "ref mainloop: GOT MSG #{inspect msg}"
-   {sender, team, x0, y0, x1, y1} = msg
-# FIXME BRAIN STOPPED HERE
-IO.puts "WE MADE IT!"
-    g2 = case team do
-# FIXME duh, first two cases are same??
-      :red -> 
-IO.puts "got RED"
-#       if who == team, do: handle_move(sender, game, team, x0, y0, x1, y1), else: game
-      :blue -> 
-IO.puts "got BLUE"
-#       if who == team, do: handle_move(sender, game, team, x0, y0, x1, y1), else: game
-      nil  -> game
-      true -> game
-    end
 
-    if ! Referee.over?(g2) do
+   case msg do
+     {sender, team, x0, y0, x1, y1} ->
+       IO.puts "Got a 6-tuple"
+     {} ->
+       IO.puts "Got EMPTY tuple"
+   end
+
+# # FIXME BRAIN STOPPED HERE
+# IO.puts "WE MADE IT!"
+#     g2 = case team do
+# # FIXME duh, first two cases are same??
+#       :red -> 
+# IO.puts "got RED"
+# #       if who == team, do: handle_move(sender, game, team, x0, y0, x1, y1), else: game
+#       :blue -> 
+# IO.puts "got BLUE"
+# #       if who == team, do: handle_move(sender, game, team, x0, y0, x1, y1), else: game
+#       nil  -> game
+#       true -> game
+#     end
+
+    if ! Referee.over?(game) do
       :timer.sleep 2000
 IO.puts "recursing!\n\n "
 :timer.sleep 2000
-      mainloop(g2) # tail recursion
+      mainloop(game) # tail recursion
     end
 IO.puts "exiting!"
   end
